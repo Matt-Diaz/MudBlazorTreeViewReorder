@@ -4,7 +4,7 @@
 
 @if (TreeItems != null)
 {
-    var rootTreeItems = TreeItems.Where(p => p.ParentID == RootID).ToList();
+    var rootTreeItems = GetRootTreeItems();
     @for (int i = 0; i < rootTreeItems.Count(); i++)
     {
         var treeItem = rootTreeItems[i];
@@ -13,9 +13,9 @@
 
         @if (childTreeItems.Count > 0)
         {
-            <div @onmousedown=@((args) => TreeViewItem_OnMouseDown(new TreeItemMouseEventArgs(args, treeItem)))
-                 @onmouseup=@((args) => TreeViewItem_OnMouseUp(new TreeItemMouseEventArgs(args, treeItem)))
-                 @onmousemove=@((args) => TreeViewItem_OnMouseMove(new TreeItemMouseEventArgs(args, treeItem)))
+            <div @onmousedown=@((args) => TreeViewItem_OnMouseDown(new (args, treeItem)))
+                 @onmouseup=@((args) => TreeViewItem_OnMouseUp(new (args, treeItem)))
+                 @onmousemove=@((args) => TreeViewItem_OnMouseMove(new (args, treeItem)))
                  @onmousedown:stopPropagation="true"
                  @onmouseup:stopPropagation="true"
                  @onmousemove:stopPropagation="true">
@@ -35,9 +35,9 @@
         }
         else
         {
-            <div @onmousedown=@((args) => TreeViewItem_OnMouseDown(new TreeItemMouseEventArgs(args, treeItem)))
-                 @onmouseup=@((args) => TreeViewItem_OnMouseUp(new TreeItemMouseEventArgs(args, treeItem)))
-                 @onmousemove=@((args) => TreeViewItem_OnMouseMove(new TreeItemMouseEventArgs(args, treeItem)))
+            <div @onmousedown=@((args) => TreeViewItem_OnMouseDown(new (args, treeItem)))
+                 @onmouseup=@((args) => TreeViewItem_OnMouseUp(new (args, treeItem)))
+                 @onmousemove=@((args) => TreeViewItem_OnMouseMove(new (args, treeItem)))
                  @onmousedown:stopPropagation="true"
                  @onmouseup:stopPropagation="true"
                  @onmousemove:stopPropagation="true">
@@ -64,8 +64,8 @@
     [Parameter]
     public EventCallback<TreeItemMouseEventArgs> TreeViewItem_OnMouseDownCallback { get; set; }
 
-    bool IsInitialized = false;
     TreeItem DraggingItem;
+    bool IsInitialized = false;
 
     protected override void OnInitialized()
     {
@@ -84,7 +84,6 @@
         var classes = "treeview-item-drop-{0} {1}";
         var dropAction = treeItem.DropAction.ToString().ToLower();
         var selected = treeItem.IsSelected ? "selected" : string.Empty;
-
         var result = string.Format(classes, dropAction, selected);
 
         return result;
@@ -96,12 +95,18 @@
         return childTreeItems;
     }
 
+    List<TreeItem> GetRootTreeItems()
+    {
+        var childTreeItems = TreeItems.Where(p => p.ParentID == RootID).ToList();
+        return childTreeItems;
+    }
+
     bool DoesTreeItemContain(TreeItem parent, TreeItem child)
     {
         if (parent == null)
             return false;
 
-        var children = TreeItems.Where(p => p.ParentID == parent.ID);
+        var children = GetChildTreeItems(parent);
         var value = false;
 
         foreach (var item in children)
@@ -119,7 +124,7 @@
     {
         if (string.IsNullOrEmpty(RootID) == false)
         {
-            TreeViewItem_OnMouseDownCallback.InvokeAsync(args).Wait();
+            await TreeViewItem_OnMouseDownCallback.InvokeAsync(args);
             return;
         }
 
@@ -127,11 +132,11 @@
         DraggingItem = args.TreeItem;
     }
 
-    void TreeViewItem_OnMouseUp(TreeItemMouseEventArgs args)
+    async Task TreeViewItem_OnMouseUp(TreeItemMouseEventArgs args)
     {
         if (string.IsNullOrEmpty(RootID) == false)
         {
-            TreeViewItem_OnMouseUpCallback.InvokeAsync(args).Wait();
+            await TreeViewItem_OnMouseUpCallback.InvokeAsync(args);
             return;
         }
 
@@ -165,11 +170,11 @@
         DraggingItem = null;
     }
 
-    void TreeViewItem_OnMouseMove(TreeItemMouseEventArgs args)
+    async Task TreeViewItem_OnMouseMove(TreeItemMouseEventArgs args)
     {
         if (string.IsNullOrEmpty(RootID) == false)
         {
-            TreeViewItem_OnMouseMoveCallback.InvokeAsync(args).Wait();
+            await TreeViewItem_OnMouseMoveCallback.InvokeAsync(args);
             return;
         }
 
