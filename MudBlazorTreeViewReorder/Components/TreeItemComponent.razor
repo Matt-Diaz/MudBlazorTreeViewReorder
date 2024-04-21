@@ -1,0 +1,202 @@
+﻿@using MudBlazor
+@using MudBlazorTreeViewReorder.Data
+@rendermode InteractiveServer
+
+@if (TreeItems != null)
+{
+    var rootTreeItems = TreeItems.Where(p => p.ParentID == RootID).ToList();
+    @for (int i = 0; i < rootTreeItems.Count(); i++)
+    {
+        var treeItem = rootTreeItems[i];
+        var childTreeItems = GetChildTreeItems(treeItem);
+        var classes = GetTreeItemClasses(treeItem);
+
+        @if (childTreeItems.Count > 0)
+        {
+            <div @onmousedown=@((args) => TreeViewItem_OnMouseDown(new TreeItemMouseEventArgs(args, treeItem)))
+                 @onmouseup=@((args) => TreeViewItem_OnMouseUp(new TreeItemMouseEventArgs(args, treeItem)))
+                 @onmousemove=@((args) => TreeViewItem_OnMouseMove(new TreeItemMouseEventArgs(args, treeItem)))
+                 @onmousedown:stopPropagation="true"
+                 @onmouseup:stopPropagation="true"
+                 @onmousemove:stopPropagation="true">
+                <MudTreeViewItem Value=@(treeItem)
+                                 Text=@(treeItem.Text)
+                                 Selected=treeItem.IsSelected
+                                 Icon=@Icons.Custom.FileFormats.FileImage
+                                 @bind-Expanded=treeItem.Expanded
+                                 class=@classes>
+                    <TreeItemComponent TreeViewItem_OnMouseDownCallback=@TreeViewItem_OnMouseDownCallback
+                                       TreeViewItem_OnMouseMoveCallback=@TreeViewItem_OnMouseMoveCallback
+                                       TreeViewItem_OnMouseUpCallback=@TreeViewItem_OnMouseUpCallback
+                                       TreeItems=TreeItems
+                                       RootID=@(treeItem.ID) />
+                </MudTreeViewItem>
+            </div>
+        }
+        else
+        {
+            <div @onmousedown=@((args) => TreeViewItem_OnMouseDown(new TreeItemMouseEventArgs(args, treeItem)))
+                 @onmouseup=@((args) => TreeViewItem_OnMouseUp(new TreeItemMouseEventArgs(args, treeItem)))
+                 @onmousemove=@((args) => TreeViewItem_OnMouseMove(new TreeItemMouseEventArgs(args, treeItem)))
+                 @onmousedown:stopPropagation="true"
+                 @onmouseup:stopPropagation="true"
+                 @onmousemove:stopPropagation="true">
+                <MudTreeViewItem Value=treeItem
+                                 Text=@(treeItem.Text)
+                                 Selected=treeItem.IsSelected
+                                 Icon=@Icons.Custom.FileFormats.FileImage
+                                 @bind-Expanded=treeItem.Expanded
+                                 class=@classes />
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter]
+    public string RootID { get; set; }
+    [Parameter]
+    public List<TreeItem> TreeItems { get; set; }
+    [Parameter]
+    public EventCallback<TreeItemMouseEventArgs> TreeViewItem_OnMouseUpCallback { get; set; }
+    [Parameter]
+    public EventCallback<TreeItemMouseEventArgs> TreeViewItem_OnMouseMoveCallback { get; set; }
+    [Parameter]
+    public EventCallback<TreeItemMouseEventArgs> TreeViewItem_OnMouseDownCallback { get; set; }
+
+    bool IsInitialized = false;
+    TreeItem DraggingItem;
+
+    protected override void OnInitialized()
+    {
+        if (IsInitialized == false && string.IsNullOrEmpty(RootID))
+        {
+            TreeViewItem_OnMouseUpCallback = new EventCallback<TreeItemMouseEventArgs>(this, TreeViewItem_OnMouseUp);
+            TreeViewItem_OnMouseMoveCallback = new EventCallback<TreeItemMouseEventArgs>(this, TreeViewItem_OnMouseMove);
+            TreeViewItem_OnMouseDownCallback = new EventCallback<TreeItemMouseEventArgs>(this, TreeViewItem_OnMouseDown);
+
+            IsInitialized = true;
+        }
+    }
+
+    string GetTreeItemClasses(TreeItem treeItem)
+    {
+        var classes = "treeview-item-drop-{0} {1}";
+        var dropAction = treeItem.DropAction.ToString().ToLower();
+        var selected = treeItem.IsSelected ? "selected" : string.Empty;
+
+        var result = string.Format(classes, dropAction, selected);
+
+        return result;
+    }
+
+    List<TreeItem> GetChildTreeItems(TreeItem treeItem)
+    {
+        var childTreeItems = TreeItems.Where(p => p.ParentID == treeItem.ID).ToList();
+        return childTreeItems;
+    }
+
+    bool DoesTreeItemContain(TreeItem parent, TreeItem child)
+    {
+        if (parent == null)
+            return false;
+
+        var children = TreeItems.Where(p => p.ParentID == parent.ID);
+        var value = false;
+
+        foreach (var item in children)
+        {
+            if (item == child)
+                value = true;
+            else
+                value |= DoesTreeItemContain(item, child);
+        }
+
+        return value;
+    }
+
+    async Task TreeViewItem_OnMouseDown(TreeItemMouseEventArgs args)
+    {
+        if (string.IsNullOrEmpty(RootID) == false)
+        {
+            TreeViewItem_OnMouseDownCallback.InvokeAsync(args).Wait();
+            return;
+        }
+
+        TreeItems.ForEach(p => p.IsSelected = (p == args.TreeItem));
+        DraggingItem = args.TreeItem;
+    }
+
+    void TreeViewItem_OnMouseUp(TreeItemMouseEventArgs args)
+    {
+        if (string.IsNullOrEmpty(RootID) == false)
+        {
+            TreeViewItem_OnMouseUpCallback.InvokeAsync(args).Wait();
+            return;
+        }
+
+        if (DraggingItem != null &&
+            DraggingItem != args.TreeItem &&
+            args.TreeItem.DropAction != DragDropAction.None &&
+            args.TreeItem.DropAction != DragDropAction.Error)
+        {
+            if (args.TreeItem.DropAction == DragDropAction.Inside)
+            {
+                DraggingItem.ParentID = args.TreeItem.ID;
+            }
+            else
+            {
+                int oldIndex = TreeItems.IndexOf(DraggingItem);
+                int newIndex = TreeItems.IndexOf(args.TreeItem);
+
+                if (args.TreeItem.DropAction == DragDropAction.Below)
+                    newIndex++;
+
+                if (newIndex > oldIndex)
+                    newIndex--;
+
+                DraggingItem.ParentID = args.TreeItem.ParentID;
+                TreeItems.RemoveAt(oldIndex);
+                TreeItems.Insert(newIndex, DraggingItem);
+            }
+        }
+
+        args.TreeItem.DropAction = DragDropAction.None;
+        DraggingItem = null;
+    }
+
+    void TreeViewItem_OnMouseMove(TreeItemMouseEventArgs args)
+    {
+        if (string.IsNullOrEmpty(RootID) == false)
+        {
+            TreeViewItem_OnMouseMoveCallback.InvokeAsync(args).Wait();
+            return;
+        }
+
+        TreeItems.ForEach(p => p.DropAction = DragDropAction.None);
+
+        if (DraggingItem != null && DraggingItem != args.TreeItem)
+        {
+            if (args.MouseEventArgs.OffsetY > 0)
+                args.TreeItem.DropAction = DragDropAction.Above;
+            if (args.MouseEventArgs.OffsetY > 10)
+                args.TreeItem.DropAction = DragDropAction.Inside;
+            if (args.MouseEventArgs.OffsetY > 30)
+                args.TreeItem.DropAction = DragDropAction.Below;
+            if (DoesTreeItemContain(DraggingItem, args.TreeItem))
+                args.TreeItem.DropAction = DragDropAction.Error;
+        }
+    }
+
+    public class TreeItemMouseEventArgs
+    {
+        public TreeItemMouseEventArgs(MouseEventArgs mouseEventArgs, TreeItem item)
+        {
+            this.MouseEventArgs = mouseEventArgs;
+            this.TreeItem = item;
+        }
+
+        public MouseEventArgs MouseEventArgs { get; set; }
+        public TreeItem TreeItem { get; set; }
+    }
+}

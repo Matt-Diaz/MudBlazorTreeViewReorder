@@ -1,0 +1,25 @@
+﻿@using MudBlazorTreeViewReorder.Data
+@rendermode InteractiveServer
+
+<MudTreeView T=TreeItem Hover=true>
+    <TreeItemComponent TreeItems=TreeItems />
+</MudTreeView>
+
+@code {
+    List<TreeItem> TreeItems = new List<TreeItem>();
+
+    protected override void OnParametersSet()
+    {
+        LoadContent();
+    }
+
+    private void LoadContent()
+    {
+        TreeItems = new List<TreeItem>();
+
+        for (int i = 0; i < 8; i++)
+        {
+            TreeItems.Add(new TreeItem($"Item {i.ToString()}", null));
+        }
+    }
+}
